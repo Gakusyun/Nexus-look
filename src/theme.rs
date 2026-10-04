@@ -291,22 +291,23 @@ impl Theme {
             rgb(0xf3f3f3)
         };
 
-        // Layers: black or white at an alpha, flattened onto what they sit on. `surface` sits on
-        // the window, `surface_hover` on a surface, `surface_pressed` on a hover.
-        let (surface, surface_hover, surface_pressed) = if dark {
-            let surface = flatten(bg, white(0.04));
-            let hover = flatten(surface, white(0.08));
-            let pressed = flatten(hover, white(0.12));
-            (surface, hover, pressed)
+        // `surface` is opaque: a translucent card would composite against the modal scrim instead
+        // of the window, and the same card would come out a different colour on the page than in a
+        // dialog. Hover and press are the opposite case — they sit on a card *or* on the window,
+        // and an overlay answers "a step away from whatever is under me", which no baked value can.
+        let surface = if dark {
+            flatten(bg, white(0.04))
         } else {
-            // Light mode's raised surface is plain white: the window is the darker one.
-            let surface = rgb(0xffffff);
-            let hover = flatten(surface, black(0.04));
-            let pressed = flatten(hover, black(0.08));
-            (surface, hover, pressed)
+            rgb(0xffffff)
         };
+        let surface_hover = if dark { white(0.08) } else { black(0.08) };
+        let surface_pressed = if dark { white(0.14) } else { black(0.14) };
 
-        let field = if dark { bg } else { rgb(0xfafafa) };
+        // An input is the window colour with a hairline around it: on a card that reads as
+        // recessed, and on the page the hairline is all it needs. Filling it with the raised
+        // surface instead put a white slab behind every box, which is a background nobody asked
+        // for and the loudest thing on the screen.
+        let field = bg;
 
         let accent = match (dark, look.accent_light) {
             (true, _) => readable(look.accent, &[bg, surface]),
@@ -557,11 +558,28 @@ mod tests {
     }
 
     #[test]
-    fn the_layers_are_opaque_so_a_modal_is_not_darker_than_a_card() {
+    fn the_card_is_opaque_so_a_modal_is_not_darker_than_a_card_on_the_page() {
         for dark in [true, false] {
             let theme = Theme::resolve(&look(), dark);
-            for color in [theme.surface, theme.surface_hover, theme.surface_pressed] {
-                assert_eq!(color.alpha, 1.0, "layers must be flattened");
+            assert_eq!(theme.surface.alpha, 1.0, "cards must be flattened");
+        }
+    }
+
+    #[test]
+    fn a_hover_layer_is_visible_on_every_ground_it_can_land_on() {
+        // The failure this guards against is a hover nobody can see. The first version baked the
+        // layer against a card, which in light mode made it *lighter* than the window — the title
+        // bar's buttons went pale instead of grey under the cursor — and 4% black on a #f3f3f3
+        // window was invisible outright.
+        for dark in [true, false] {
+            let theme = Theme::resolve(&look(), dark);
+            for layer in [theme.surface_hover, theme.surface_pressed] {
+                assert!(layer.alpha < 1.0, "hover and press are overlays");
+                for (name, ground) in [("the window", theme.bg), ("a card", theme.surface)] {
+                    let over = flatten(ground, layer);
+                    let ratio = contrast(over, ground);
+                    assert!(ratio > 1.1, "a hover on {name} moved by only {ratio:.3}:1");
+                }
             }
         }
     }
