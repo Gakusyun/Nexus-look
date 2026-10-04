@@ -202,6 +202,17 @@ impl Look {
         );
         cx.set_global(theme);
     }
+
+    /// Edit the configuration and re-derive the palette.
+    ///
+    /// The one way a running app changes its look. It reads the current global, applies `edit` and
+    /// reinstalls both halves, so a caller cannot change the accent and forget to repaint, or
+    /// repaint without having changed anything.
+    pub fn update(cx: &mut App, edit: impl FnOnce(&mut Look)) {
+        let mut look = cx.global::<Look>().clone();
+        edit(&mut look);
+        look.refresh(cx);
+    }
 }
 
 // -------------------------------------------------------------------------------------------
