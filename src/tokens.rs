@@ -140,8 +140,8 @@ pub mod text {
 pub mod motion {
     use std::time::Duration;
 
-    /// Hover and press: colour only.
-    pub const FAST: Duration = Duration::from_millis(100);
+    // Hover and press are deliberately absent: they are resolved while painting, with no fade at
+    // all (see `STYLE.md` §6.1). A duration here would invite someone to reintroduce the bug.
     /// Fade, tab indicator, progress fill.
     pub const BASE: Duration = Duration::from_millis(160);
     /// Modal in and out, detail panel sliding.
