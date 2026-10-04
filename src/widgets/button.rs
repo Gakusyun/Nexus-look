@@ -9,7 +9,8 @@
 
 use gpui::prelude::*;
 use gpui::{
-    AnimationExt, App, ClickEvent, ElementId, FontWeight, ParentElement, RenderOnce, Rgba,
+    AnimationExt, App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce,
+    Rgba,
     SharedString, Styled, Window, div, px,
 };
 
@@ -88,6 +89,10 @@ fn transparent() -> Rgba {
 }
 
 /// A button with a label, and optionally a leading icon.
+///
+/// The `IntoElement` derive is what lets this be a child: `RenderOnce` describes how to build the
+/// element tree, and the derive supplies the `Element` impl that hands it to the parent.
+#[derive(IntoElement)]
 pub struct Button {
     id: ElementId,
     label: SharedString,

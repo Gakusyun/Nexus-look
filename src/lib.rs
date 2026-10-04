@@ -38,7 +38,8 @@ pub use assets::Assets;
 pub use theme::{Look, Theme, ThemeMode, Tone, contrast, readable, readable_on};
 pub use tokens::*;
 pub use widgets::{
-    Button, IconButton, Sizing, TextEdit, TextInput, Variant, card, divider, heading, hint, icon,
+    Button, IconButton, Sizing, TextEdit, TextInput, TitleBar, Variant, card, divider, heading, hint,
+    icon,
 };
 
 /// Install the look: the configuration and the palette that follows from it.

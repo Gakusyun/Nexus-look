@@ -19,11 +19,13 @@ mod button;
 mod icon_button;
 pub mod text_edit;
 mod text_input;
+mod title_bar;
 
 pub use button::{Button, Variant};
 pub use icon_button::IconButton;
 pub use text_edit::TextEdit;
 pub use text_input::TextInput;
+pub use title_bar::TitleBar;
 
 use std::time::Duration;
 
@@ -32,7 +34,6 @@ use gpui::{
     Animation, App, Div, ElementId, Entity, FontWeight, Rgba, SharedString, Svg, Window, div,
     ease_in_out, px, rgb, svg,
 };
-
 use crate::theme::{Look, Theme, Tone};
 use crate::tokens::{ICON_SM, RADIUS, space, text};
 

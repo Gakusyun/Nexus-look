@@ -28,6 +28,7 @@ pub enum Tone {
     Danger,
 }
 
+#[derive(IntoElement)]
 pub struct IconButton {
     id: ElementId,
     glyph: SharedString,
