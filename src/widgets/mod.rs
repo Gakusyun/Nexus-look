@@ -20,17 +20,23 @@ mod icon_button;
 pub mod text_edit;
 mod text_input;
 mod title_bar;
+mod toast;
 
 pub use button::{Button, Variant};
 pub use icon_button::IconButton;
 pub use text_edit::TextEdit;
 pub use text_input::TextInput;
 pub use title_bar::TitleBar;
+pub use toast::Toast;
 
 use crate::theme::{Look, Theme, Tone};
 use crate::tokens::{ICON_SM, RADIUS, space, text};
 use gpui::prelude::*;
-use gpui::{App, Div, ElementId, FontWeight, Rgba, SharedString, Svg, Window, div, px, rgb, svg};
+use gpui::{
+    Animation, App, Div, ElementId, FontWeight, Rgba, SharedString, Svg, Window, div,
+    ease_out_quint, px, rgb, svg,
+};
+use std::time::Duration;
 
 /// How big a control is. Two sizes, and the second one has to be earned (see `STYLE.md`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -100,6 +106,16 @@ pub(crate) fn lift(color: Rgba, dark: bool, amount: f32) -> Rgba {
 /// this wrong is silent: two controls sharing a group would light each other's icons.
 pub(crate) fn group_name(id: &ElementId) -> SharedString {
     SharedString::from(format!("look:{id:?}"))
+}
+
+/// The easing for anything that arrives and stays: a modal, a toast, a panel.
+///
+/// Hover is deliberately *not* on this list. A control's own colour is applied by `hover()` and its
+/// icon's by `group_hover()`, both of which the framework resolves while painting: one frame, one
+/// change, nothing to get stuck halfway. A *transition* needs a state that outlives a frame, and a
+/// `RenderOnce` widget has nowhere to keep one — see `gs-issue.md` in any host project.
+pub(crate) fn settle(duration: Duration) -> Animation {
+    Animation::new(duration).with_easing(ease_out_quint())
 }
 
 /// A raised surface: cards, the command bar, the detail panel, a settings group.
