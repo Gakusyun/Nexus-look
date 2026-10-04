@@ -234,8 +234,13 @@ pub struct Theme {
     /// One step above a surface: a row inside a card, an icon button under the cursor.
     pub surface_hover: Rgba,
     pub surface_pressed: Rgba,
-    /// Inputs. Recessed: darker than `surface` in both modes, so "you can type here" is a shape
-    /// rather than a colour.
+    /// Inputs carry **no ground of their own** — a hairline is the whole box.
+    ///
+    /// Transparent rather than a colour, because the box sits on two different grounds and one
+    /// baked value cannot be right for both: on the page it must equal `bg` (so the command bar's
+    /// field reads as nothing but an outline), and on a card it must equal `surface`. Filling it
+    /// with anything else made the same widget read as "a page input" on one screen and "a grey
+    /// slab someone stuck on a white card" on the next.
     pub field: Rgba,
 
     // Edges
@@ -303,11 +308,10 @@ impl Theme {
         let surface_hover = if dark { white(0.08) } else { black(0.08) };
         let surface_pressed = if dark { white(0.14) } else { black(0.14) };
 
-        // An input is the window colour with a hairline around it: on a card that reads as
-        // recessed, and on the page the hairline is all it needs. Filling it with the raised
-        // surface instead put a white slab behind every box, which is a background nobody asked
-        // for and the loudest thing on the screen.
-        let field = bg;
+        // No colour: the hairline makes the box and the ground it sits on fills it. See the
+        // `field` field's own docs — the short version is that `bg` was right for the page and
+        // wrong for every card, and the widget is used on both.
+        let field = transparent();
 
         let accent = match (dark, look.accent_light) {
             (true, _) => readable(look.accent, &[bg, surface]),
@@ -593,11 +597,14 @@ mod tests {
     }
 
     #[test]
-    fn an_input_is_recessed_in_both_modes() {
-        let dark = Theme::resolve(&look(), true);
-        assert!(luminance(dark.field) < luminance(dark.surface));
-        let light = Theme::resolve(&look(), false);
-        assert!(luminance(light.field) < luminance(light.surface));
+    fn an_input_has_no_ground_of_its_own() {
+        for dark in [true, false] {
+            let theme = Theme::resolve(&look(), dark);
+            // The box is the hairline and whatever is behind it. Baking in a colour made the same
+            // widget look like the page on one screen and like a grey slab on a white card on the
+            // next — which is exactly what a settings sheet is.
+            assert_eq!(theme.field, transparent());
+        }
     }
 
     #[test]
