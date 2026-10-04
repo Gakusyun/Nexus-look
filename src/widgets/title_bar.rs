@@ -16,8 +16,8 @@
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, IntoElement, ParentElement, SharedString, Styled, Window, WindowControlArea,
-    div, px,
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    WindowControlArea, div, px,
 };
 
 use super::{IconButton, icon};
@@ -26,6 +26,12 @@ use crate::theme::{Look, Theme};
 use crate::tokens::{ICON_MD, TITLEBAR, space, text};
 
 /// What the app puts in its title bar beyond the four window controls.
+///
+/// A `RenderOnce` widget rather than a builder with a `build(window, cx)`: the derive is what lets
+/// it be a *child*, so a view writes the same thing whether it is composing a title bar, a button
+/// or a `div`. Nothing here takes a `Theme` argument, which means nothing here can be handed a
+/// stale one.
+#[derive(IntoElement)]
 pub struct TitleBar {
     title: SharedString,
     logo: Option<SharedString>,
@@ -56,11 +62,11 @@ impl TitleBar {
         self.actions.push(element.into_any_element());
         self
     }
+}
 
-    /// Returns a concrete element tree: nothing in it borrows the window or the theme, so callers
-    /// can hand it straight to a parent without carrying either lifetime along.
-    pub fn build(self, window: &Window, cx: &App) -> impl IntoElement + use<> {
-        let theme = Theme::of(cx);
+impl RenderOnce for TitleBar {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = Theme::of(cx).clone();
         let font = Look::of(cx).font(window);
         let Self {
             title,

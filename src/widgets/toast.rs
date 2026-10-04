@@ -18,8 +18,8 @@
 //!   here worth that state machine.
 
 use gpui::{
-    AnimationExt, App, BoxShadow, ColorExt, ElementId, IntoElement, ParentElement, Rgba,
-    SharedString, Styled, Window, div, px,
+    AnimationExt, App, BoxShadow, ElementId, IntoElement, ParentElement, RenderOnce, SharedString,
+    Styled, Window, div, px,
 };
 
 use super::{icon, settle};
@@ -27,6 +27,7 @@ use crate::icons;
 use crate::theme::{Look, Theme, Tone};
 use crate::tokens::{ICON_MD, RADIUS, motion, space, text};
 
+#[derive(IntoElement)]
 pub struct Toast {
     id: ElementId,
     message: SharedString,
@@ -55,10 +56,11 @@ impl Toast {
         self.glyph = glyph.into();
         self
     }
+}
 
-    /// Place the toast. The parent must be `relative()`; this takes no room in its layout.
-    pub fn build(self, window: &Window, cx: &App) -> impl IntoElement + use<> {
-        let theme = Theme::of(cx);
+impl RenderOnce for Toast {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = Theme::of(cx).clone();
         let font = Look::of(cx).font(window);
         let Self {
             id,
@@ -98,6 +100,8 @@ impl Toast {
                     .font(font)
                     .text_size(px(text::BODY))
                     .text_color(ink)
+                    .child(icon(glyph, ICON_MD, mark))
+                    .child(message)
                     .shadow(vec![
                         BoxShadow::new(px(0.0), px(8.0), shadow).blur_radius(px(32.0)),
                     ])
@@ -105,17 +109,12 @@ impl Toast {
                         (id, "enter"),
                         settle(motion::BASE),
                         move |element, delta| {
-                            // Element opacity does not exist in this version (`Styled` has no
-                            // `opacity()`), so every colour carries the fade itself. The card
-                            // starts a step *above* where it settles and drops into place.
-                            let fade = move |color: Rgba| color.opacity(delta);
+                            // The card starts a step *above* where it settles and drops into place.
+                            // `Styled::opacity` is what carries the fade through the icon and the
+                            // text in the same pass as the card they sit on.
                             element
+                                .opacity(delta)
                                 .mt(px(-motion::SHIFT * (1.0 - delta)))
-                                .bg(fade(surface))
-                                .border_color(fade(border))
-                                .text_color(fade(ink))
-                                .child(icon(glyph.clone(), ICON_MD, fade(mark)))
-                                .child(message.clone())
                         },
                     ),
             )

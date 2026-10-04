@@ -11,12 +11,14 @@
 //! * **A `Svg` with no colour of its own is skipped entirely** — not drawn in black, skipped. So
 //!   every icon takes its tint as an argument (see [`icon`]).
 //! * **Hover styles in this version are not transitioned.** `hover(..)` swaps a style refinement
-//!   instantly. Animated hover therefore needs the hover *state* to be readable during render,
-//!   which is what [`track_hover`] is for: it parks a tiny entity in the element state tree keyed
-//!   by the widget's own id, so a stateless `RenderOnce` widget can still animate.
+//!   instantly, and that is the whole rule: a hover is one frame, one colour, nothing to get stuck
+//!   halfway — see `STYLE.md` §6.1.
 
 mod button;
 mod icon_button;
+mod modal;
+mod segmented;
+mod setting;
 pub mod text_edit;
 mod text_input;
 mod title_bar;
@@ -24,6 +26,9 @@ mod toast;
 
 pub use button::{Button, Variant};
 pub use icon_button::IconButton;
+pub use modal::{Modal, modal_body_max, modal_width, scroll_fade};
+pub use segmented::{Choice, Segmented};
+pub use setting::{Row, SettingGroup, subheading};
 pub use text_edit::TextEdit;
 pub use text_input::TextInput;
 pub use title_bar::TitleBar;
@@ -36,6 +41,7 @@ use gpui::{
     Animation, App, Div, ElementId, FontWeight, Rgba, SharedString, Svg, Window, div,
     ease_out_quint, px, rgb, svg,
 };
+use std::sync::Arc;
 use std::time::Duration;
 
 /// How big a control is. Two sizes, and the second one has to be earned (see `STYLE.md`).
@@ -108,6 +114,15 @@ pub(crate) fn group_name(id: &ElementId) -> SharedString {
     SharedString::from(format!("look:{id:?}"))
 }
 
+/// The id of a part of a widget — the scroller inside a modal, one option inside a segmented
+/// control. **Two elements may never share an id**: GPUI keeps a control's scroll offset, selection
+/// and hover state under its id, so a collision shows up as one control moving because another one
+/// did. Every part of a widget therefore derives its id from the widget's own, and never invents a
+/// fresh string that could collide with a sibling somewhere else.
+pub(crate) fn part_id(parent: &ElementId, part: impl Into<SharedString>) -> ElementId {
+    ElementId::NamedChild(Arc::new(parent.clone()), part.into())
+}
+
 /// The easing for anything that arrives and stays: a modal, a toast, a panel.
 ///
 /// Hover is deliberately *not* on this list. A control's own colour is applied by `hover()` and its
@@ -122,7 +137,11 @@ pub(crate) fn settle(duration: Duration) -> Animation {
 ///
 /// A function rather than a builder because there is nothing to decide — the moment a caller needs
 /// a different padding they are describing a different thing, and that thing should get a name.
-pub fn card(theme: &Theme) -> Div {
+///
+/// Every free widget in here takes `cx` and reads the palette itself, so a view never has to carry
+/// a `Theme` down to the leaf it paints — and never gets the chance to read a stale one.
+pub fn card(cx: &App) -> Div {
+    let theme = Theme::of(cx);
     div()
         .rounded(px(RADIUS))
         .border_1()
@@ -132,8 +151,8 @@ pub fn card(theme: &Theme) -> Div {
 }
 
 /// A hairline between two groups of things.
-pub fn divider(theme: &Theme) -> Div {
-    div().h(px(1.0)).w_full().bg(theme.border_soft)
+pub fn divider(cx: &App) -> Div {
+    div().h(px(1.0)).w_full().bg(Theme::of(cx).border_soft)
 }
 
 /// The one line of explanatory text under a control.
@@ -141,22 +160,26 @@ pub fn divider(theme: &Theme) -> Div {
 /// There is no second hint widget and no `error_note`: an error is a hint whose tone is
 /// [`Tone::Danger`], which is exactly the rule for semantic colours — the pixel is describing a
 /// state, so it is allowed to have a colour.
-pub fn hint(
-    text_str: impl Into<SharedString>,
-    tone: Tone,
-    theme: &Theme,
-    window: &Window,
-    cx: &App,
-) -> Div {
+///
+/// `Tone::Neutral` paints `text_faint` rather than `tone(Neutral)`'s `text_muted`, because a hint
+/// is the quietest text on the card and `STYLE.md` §10 says so; `text_muted` belongs to a value
+/// someone is meant to read, not to a footnote. Every other tone is the state colour itself.
+pub fn hint(text_str: impl Into<SharedString>, tone: Tone, window: &Window, cx: &App) -> Div {
+    let theme = Theme::of(cx);
+    let colour = match tone {
+        Tone::Neutral => theme.text_faint,
+        other => theme.tone(other),
+    };
     div()
         .text_size(px(text::CAPTION))
-        .text_color(theme.tone(tone))
+        .text_color(colour)
         .font(Look::of(cx).font(window))
         .child(text_str.into())
 }
 
 /// A section heading inside a card or a modal body.
-pub fn heading(label: impl Into<SharedString>, theme: &Theme, window: &Window, cx: &App) -> Div {
+pub fn heading(label: impl Into<SharedString>, window: &Window, cx: &App) -> Div {
+    let theme = Theme::of(cx);
     div()
         .text_size(px(text::HEADING))
         .font_weight(FontWeight::SEMIBOLD)

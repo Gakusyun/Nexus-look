@@ -34,6 +34,12 @@ pub const CONTROL: f32 = 32.0;
 /// controls has no large controls.
 pub const CONTROL_LG: f32 = 40.0;
 
+/// Padding inside a segmented control, and therefore the height of one of its options:
+/// `CONTROL - SEGMENT_PAD * 2 - STROKE * 2` adds up to exactly [`SEGMENT`], so a picker and the box
+/// beside it in the same row share a top and a bottom edge.
+pub const SEGMENT_PAD: f32 = 2.0;
+pub const SEGMENT: f32 = CONTROL - SEGMENT_PAD * 2.0 - STROKE * 2.0;
+
 /// A list row: two lines of text, a progress bar, and the row's actions.
 pub const ROW: f32 = 56.0;
 
@@ -101,6 +107,8 @@ pub mod layout {
     pub const MODAL_W: f32 = 640.0;
     /// Floor for the above when the window is small; below this the table stops making sense.
     pub const MODAL_W_MIN: f32 = 560.0;
+    /// Room a modal always leaves at the left and right edges of the window.
+    pub const MODAL_W_SLACK: f32 = 80.0;
     /// A confirmation's width: one sentence and two buttons. A 640px card would be mostly
     /// whitespace, and whitespace around a destructive question reads as uncertainty.
     pub const MODAL_W_NARROW: f32 = 400.0;
@@ -132,7 +140,7 @@ pub mod text {
 // Motion
 // ---------------------------------------------------------------------------------------------
 
-/// Three durations, one easing curve per direction, and no fourth of either.
+/// Two durations, one easing curve per direction, and no third of either.
 ///
 /// Every animation goes through GPUI's `with_animation`, which honours `App::reduce_motion`
 /// for us (`gpui-ce/src/elements/animation.rs:46`). Hand-rolled timers do not, which is the whole
