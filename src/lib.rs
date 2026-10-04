@@ -9,13 +9,43 @@
 //! - **Three colours** — black, white, and the project's accent. Everything else is black or
 //!   white at some alpha, except a small group of semantic colours that may only be used where
 //!   they *describe a state*.
-//! - **One radius** — every rectangle is [`RADIUS`] millimetres-of-pixels; pills are a different
-//!   *shape*, not a different radius.
+//! - **One radius** — every rectangle is [`RADIUS`]; pills are a different *shape*, not a
+//!   different radius.
 //! - **Two heights** — [`CONTROL`] and [`CONTROL_LG`]. A row with two controls in it has exactly
 //!   two usable heights, and both of them line up.
 //!
+//! ```ignore
+//! let look = Look::new().accent(0x7c5cff).oled(false);
+//! gpui_platform::application()
+//!     .with_assets(nexus_look::Assets.chain(my_icons))
+//!     .run(move |cx| {
+//!         nexus_look::init(cx, look);
+//!         // …open a window; `Theme::of(cx)` answers with the palette from now on.
+//!     });
+//! ```
+//!
 //! Call sites supply data and behaviour; colour, size, spacing and timing come from here.
 
+pub mod assets;
+pub mod icons;
+pub mod theme;
 pub mod tokens;
+pub mod widgets;
 
+use gpui::App;
+
+pub use assets::Assets;
+pub use theme::{Look, Theme, ThemeMode, Tone, contrast, readable, readable_on};
 pub use tokens::*;
+pub use widgets::{
+    Button, IconButton, Sizing, TextEdit, TextInput, Variant, card, divider, heading, hint, icon,
+};
+
+/// Install the look: the configuration and the palette that follows from it.
+///
+/// Both go in as globals, which is what lets a widget read the font and the colours without every
+/// call site threading them through — and what makes changing the accent in a settings sheet reach
+/// every widget on the next frame.
+pub fn init(cx: &mut App, look: Look) -> Theme {
+    look.install(cx)
+}
