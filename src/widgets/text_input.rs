@@ -18,6 +18,8 @@
 //! node in the dispatch tree, so keystrokes are dispatched from the window root and dropped — which
 //! reads as "backspace does nothing"), and the font is resolved once, from `Look`.
 
+use std::cell::Cell;
+use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::prelude::*;
@@ -59,10 +61,14 @@ pub struct TextInput {
     focus: FocusHandle,
     placeholder: SharedString,
     sizing: Sizing,
-    /// How much room the surrounding layout leaves for the *text*. Only the caret's scroll offset
-    /// depends on it, and erring small only ever keeps the caret visible. Callers that know their
-    /// column width pass it; the rest get a viewport-based estimate.
-    text_width: Option<f32>,
+    /// The width of the text row, as the layout actually gave it.
+    ///
+    /// Measured by the `canvas` overlay during paint (see [`surface`]) rather than estimated from
+    /// the viewport: the only thing that depends on it is how far the line scrolls to keep the
+    /// caret in view, and a wrong estimate is invisible until it is a caret sitting under the
+    /// buttons to its right. Read during the *next* render, because layout cannot run before the
+    /// frame it belongs to — one frame of staleness, and only while the window is being resized.
+    measured: Rc<Cell<f32>>,
     caret_on: bool,
     focused: bool,
     dragging: bool,
@@ -103,7 +109,7 @@ impl TextInput {
             focus,
             placeholder: placeholder.into(),
             sizing: Sizing::Md,
-            text_width: None,
+            measured: Rc::new(Cell::new(0.0)),
             caret_on: true,
             focused: false,
             dragging: false,
@@ -115,12 +121,6 @@ impl TextInput {
 
     pub fn large(mut self) -> Self {
         self.sizing = Sizing::Lg;
-        self
-    }
-
-    /// How much room the layout leaves for the text. See the field docs.
-    pub fn text_width(mut self, width: f32) -> Self {
-        self.text_width = Some(width);
         self
     }
 
@@ -178,9 +178,11 @@ impl TextInput {
     }
 
     /// How much room the line has before it must scroll.
-    fn available(&self, window: &Window) -> f32 {
-        self.text_width
-            .unwrap_or_else(|| (window.viewport_size().width.as_f32() - 160.0).max(60.0))
+    fn available(&self) -> f32 {
+        // Nothing measured yet (the first frame): err small, which only ever scrolls the line
+        // sooner than it had to.
+        let measured = self.measured.get();
+        if measured > 0.0 { measured } else { 60.0 }
     }
 }
 
@@ -430,7 +432,7 @@ impl Render for TextInput {
 
         let size = text::BODY;
         let height = self.sizing.height();
-        let available = self.available(window);
+        let available = self.available();
         let shift = caret_shift(
             self.edit.text(),
             self.edit.cursor(),
@@ -483,6 +485,9 @@ impl Render for TextInput {
             .gap(px(space::SM))
             .h(px(height))
             .px(px(space::MD))
+            // Full width: a caller that wants a narrower box wraps it in a sized one, and the
+            // caret's scrolling then measures itself against whatever that turned out to be.
+            .w_full()
             .flex_none()
             .rounded(px(RADIUS))
             .bg(theme.field)
@@ -534,7 +539,7 @@ impl Render for TextInput {
                         &self.placeholder,
                         &theme,
                     ))
-                    .child(surface(&self.focus, entity, shift)),
+                    .child(surface(&self.focus, entity, shift, self.measured.clone())),
             )
     }
 }
@@ -549,11 +554,14 @@ fn surface(
     focus: &FocusHandle,
     entity: gpui::Entity<TextInput>,
     shift: f32,
+    measured: Rc<Cell<f32>>,
 ) -> impl IntoElement + use<> {
     let focus = focus.clone();
     canvas(
         move |_bounds, _window, _cx| {},
         move |bounds, (), window, app| {
+            // The one place the text row's real width is knowable; see `TextInput::measured`.
+            measured.set(bounds.size.width.as_f32());
             if focus.is_focused(window) {
                 window.handle_input(
                     &focus,
