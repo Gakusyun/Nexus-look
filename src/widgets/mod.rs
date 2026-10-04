@@ -27,15 +27,10 @@ pub use text_edit::TextEdit;
 pub use text_input::TextInput;
 pub use title_bar::TitleBar;
 
-use std::time::Duration;
-
 use crate::theme::{Look, Theme, Tone};
 use crate::tokens::{ICON_SM, RADIUS, space, text};
 use gpui::prelude::*;
-use gpui::{
-    Animation, App, Div, ElementId, Entity, FontWeight, Rgba, SharedString, Svg, Window, div,
-    ease_in_out, px, rgb, svg,
-};
+use gpui::{App, Div, ElementId, FontWeight, Rgba, SharedString, Svg, Window, div, px, rgb, svg};
 
 /// How big a control is. Two sizes, and the second one has to be earned (see `STYLE.md`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -88,72 +83,23 @@ pub fn icon(path: impl Into<SharedString>, size: f32, tint: Rgba) -> Svg {
 /// than guessing from the accent.
 pub(crate) fn lift(color: Rgba, dark: bool, amount: f32) -> Rgba {
     let toward = if dark { rgb(0xffffff) } else { rgb(0x000000) };
-    blend(color, toward, amount)
-}
-
-/// Straight sRGB interpolation. Not colour-correct, and deliberately so: a 100ms hover fade has no
-/// visible mid-tone, and a correct-space conversion per frame would be work for nobody.
-pub(crate) fn blend(from: Rgba, to: Rgba, t: f32) -> Rgba {
-    let t = t.clamp(0.0, 1.0);
-    let (fr, fg, fb) = crate::theme::channels(from);
-    let (tr, tg, tb) = crate::theme::channels(to);
+    let (fr, fg, fb) = crate::theme::channels(color);
+    let (tr, tg, tb) = crate::theme::channels(toward);
     crate::theme::srgb(
-        fr + (tr - fr) * t,
-        fg + (tg - fg) * t,
-        fb + (tb - fb) * t,
-        from.alpha + (to.alpha - from.alpha) * t,
+        fr + (tr - fr) * amount,
+        fg + (tg - fg) * amount,
+        fb + (tb - fb) * amount,
+        color.alpha,
     )
 }
 
-/// The easing for anything that toggles back and forth: hover, press, selection.
-pub(crate) fn toggle(duration: Duration) -> Animation {
-    Animation::new(duration).with_easing(ease_in_out)
-}
-
-/// Whether a control is under the cursor, kept for as long as the control keeps its id.
+/// The name a control publishes its hover state under.
 ///
-/// `ever` exists because a hover animation is a transition keyed on which state is current, so the
-/// frame the animation starts at always draws the state it is coming *from*. On mount that would
-/// mean every button flashing its hover colour for one frame. Until the pointer has arrived once
-/// there is nothing to transition from, so the widget paints the resting state directly and never
-/// starts an animation at all.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) struct Hover {
-    pub hovered: bool,
-    pub ever: bool,
-}
-
-/// Park a hover flag for `id` and read its current value.
-///
-/// A widget cannot store hover in a field: `RenderOnce` values are rebuilt from scratch every
-/// frame, so a flag set by `on_hover` would be gone before the next render could read it. GPUI's
-/// element state tree is the only place that outlives a frame without the widget owning an entity,
-/// and `use_keyed_state` even re-notifies the owning view when the flag changes — which is what
-/// makes the following frame start the animation.
-pub(crate) fn track_hover(
-    id: &ElementId,
-    window: &mut Window,
-    cx: &mut App,
-) -> (Entity<Hover>, Hover) {
-    let state = window.use_keyed_state(id.clone(), cx, |_, _| Hover::default());
-    let current = *state.read(cx);
-    (state, current)
-}
-
-/// The listener half of [`track_hover`], ready to hand to `on_hover`.
-pub(crate) fn watch_hover(state: Entity<Hover>) -> impl Fn(&bool, &mut Window, &mut App) + 'static {
-    move |hovered: &bool, _window, cx| {
-        state.update(cx, |state, cx| {
-            let next = Hover {
-                hovered: *hovered,
-                ever: state.ever || *hovered,
-            };
-            if *state != next {
-                *state = next;
-                cx.notify();
-            }
-        });
-    }
+/// `group_hover` matches on a *name*, not on an element id, so a control whose icon has to follow
+/// its own hover state must publish one. Derived from the id, because the failure mode of getting
+/// this wrong is silent: two controls sharing a group would light each other's icons.
+pub(crate) fn group_name(id: &ElementId) -> SharedString {
+    SharedString::from(format!("look:{id:?}"))
 }
 
 /// A raised surface: cards, the command bar, the detail panel, a settings group.

@@ -7,13 +7,13 @@
 
 use gpui::prelude::*;
 use gpui::{
-    AnimationExt, App, ClickEvent, ColorExt, ElementId, RenderOnce, Rgba, SharedString, Window,
+    App, ClickEvent, ColorExt, ElementId, RenderOnce, Rgba, SharedString, Window,
     WindowControlArea, div, px,
 };
 
-use super::{Sizing, blend, icon, lift, toggle, track_hover, watch_hover};
+use super::{Sizing, group_name, icon, lift};
 use crate::theme::Theme;
-use crate::tokens::{RADIUS, motion};
+use crate::tokens::RADIUS;
 
 pub type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -142,7 +142,7 @@ fn transparent() -> Rgba {
 }
 
 impl RenderOnce for IconButton {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = Theme::of(cx).clone();
         let Self {
             id,
@@ -156,16 +156,17 @@ impl RenderOnce for IconButton {
         } = self;
 
         let palette = Palette::of(tone, active, &theme);
-        let (hover, state) = track_hover(&id, window, cx);
-        let size = sizing.height();
-        let glyph_size = sizing.glyph();
+        let group = group_name(&id);
 
-        let element = div()
-            .id(id.clone())
+        div()
+            .id(id)
+            // The icon cannot see this element's hover, and a style set here would not reach it:
+            // the group is how the tint travels.
+            .group(group.clone())
             .flex()
             .items_center()
             .justify_center()
-            .size(px(size))
+            .size(px(sizing.height()))
             .flex_none()
             .rounded(px(RADIUS))
             .border_1()
@@ -176,40 +177,14 @@ impl RenderOnce for IconButton {
             })
             .bg(palette.bg)
             .cursor_pointer()
-            .on_hover(watch_hover(hover))
+            .hover(move |style| style.bg(palette.bg_hover))
             .when_some(area, |element, area| element.window_control_area(area))
             .when_some(handler, |element, handler| {
                 element.on_click(move |event, window, cx| handler(event, window, cx))
-            });
-
-        if !state.ever {
-            return element
-                .child(icon(glyph, glyph_size, palette.fg))
-                .into_any_element();
-        }
-
-        element
-            .with_animation(
-                (
-                    id,
-                    if state.hovered {
-                        "hover-in"
-                    } else {
-                        "hover-out"
-                    },
-                ),
-                toggle(motion::FAST),
-                move |element, delta| {
-                    let t = if state.hovered { delta } else { 1.0 - delta };
-                    element
-                        .bg(blend(palette.bg, palette.bg_hover, t))
-                        .child(icon(
-                            glyph.clone(),
-                            glyph_size,
-                            blend(palette.fg, palette.fg_hover, t),
-                        ))
-                },
+            })
+            .child(
+                icon(glyph, sizing.glyph(), palette.fg)
+                    .group_hover(group, move |style| style.text_color(palette.fg_hover)),
             )
-            .into_any_element()
     }
 }

@@ -9,13 +9,13 @@
 
 use gpui::prelude::*;
 use gpui::{
-    AnimationExt, App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce,
-    Rgba, SharedString, Styled, Window, div, px,
+    App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Rgba,
+    SharedString, Styled, Window, div, px,
 };
 
-use super::{Sizing, blend, icon, lift, toggle, track_hover, watch_hover};
+use super::{Sizing, group_name, icon, lift};
 use crate::theme::{Look, Theme};
-use crate::tokens::{RADIUS, motion, space, text};
+use crate::tokens::{RADIUS, space, text};
 
 pub type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -158,28 +158,6 @@ impl Button {
     }
 }
 
-/// The label and the icon, painted in `fg`.
-///
-/// Split out because it is drawn twice: once for the resting state (no animation has ever run) and
-/// once per frame while the hover fades. Building it in one place is what keeps those two from
-/// disagreeing about the gap or the icon size.
-fn content<E>(
-    element: E,
-    glyph: Option<SharedString>,
-    label: SharedString,
-    glyph_size: f32,
-    fg: Rgba,
-) -> E
-where
-    E: Styled + ParentElement,
-{
-    let element = element.text_color(fg);
-    match glyph {
-        Some(path) => element.child(icon(path, glyph_size, fg)).child(label),
-        None => element.child(label),
-    }
-}
-
 impl RenderOnce for Button {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = Theme::of(cx).clone();
@@ -195,19 +173,26 @@ impl RenderOnce for Button {
         } = self;
 
         let palette = Palette::of(variant, &theme);
+        // A disabled control does not react to the cursor at all — not a dimmer hover, not a
+        // different cursor, nothing. Anything else reads as "it noticed, it just will not".
+        let interacting = !disabled;
         let fg = if disabled {
             theme.text_disabled
         } else {
             palette.fg
         };
-        let (hover, state) = track_hover(&id, window, cx);
-        // A disabled control does not react to the cursor at all — not a dimmer hover, not a
-        // different cursor, nothing. Anything else reads as "it noticed, it just will not".
-        let interacting = !disabled;
-        let hovered = interacting && state.hovered;
+        let fg_hover = if disabled {
+            theme.text_disabled
+        } else {
+            palette.fg_hover
+        };
+        let group = group_name(&id);
 
-        let element = div()
-            .id(id.clone())
+        div()
+            .id(id)
+            // Publishing the group is what lets the icon and the label follow a hover they cannot
+            // observe themselves: styles do not inherit, so a tint set here would reach neither.
+            .group(group.clone())
             .flex()
             .flex_row()
             .items_center()
@@ -227,37 +212,32 @@ impl RenderOnce for Button {
             .when(interacting, |element| {
                 element
                     .cursor_pointer()
-                    .on_hover(watch_hover(hover))
-                    // Press is instant on purpose: a press that fades in reads as lag, and the
-                    // animation budget is better spent on the state the user is *arriving at*.
+                    // Instant, and resolved by the framework while it paints: one frame, one
+                    // change. A transition here would have to be keyed on a hover flag that
+                    // outlives the frame, and this widget would end up repainting itself to fade a
+                    // colour it could simply have set.
+                    .hover(move |style| style.bg(palette.hover))
                     .active(move |style| style.bg(palette.pressed))
             })
             .when_some(handler, |element, handler| {
                 element.on_click(move |event, window, cx| handler(event, window, cx))
-            });
-
-        let glyph_size = sizing.glyph();
-        if !interacting || !state.ever {
-            return content(element, glyph, label, glyph_size, fg).into_any_element();
-        }
-
-        element
-            .with_animation(
-                (id, if hovered { "hover-in" } else { "hover-out" }),
-                toggle(motion::FAST),
-                move |element, delta| {
-                    let t = if hovered { delta } else { 1.0 - delta };
-                    let fg = blend(palette.fg, palette.fg_hover, t);
-                    content(
-                        element.bg(blend(palette.rest, palette.hover, t)),
-                        glyph.clone(),
-                        label.clone(),
-                        glyph_size,
-                        fg,
-                    )
-                },
-            )
-            .into_any_element()
+            })
+            .children(glyph.map(|path| {
+                let glyph = icon(path, sizing.glyph(), fg);
+                if interacting {
+                    glyph.group_hover(group.clone(), move |style| style.text_color(fg_hover))
+                } else {
+                    glyph
+                }
+            }))
+            .child({
+                let label = div().text_color(fg).child(label);
+                if interacting {
+                    label.group_hover(group, move |style| style.text_color(fg_hover))
+                } else {
+                    label
+                }
+            })
     }
 }
 
