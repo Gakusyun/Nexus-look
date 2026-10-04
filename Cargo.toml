@@ -1,0 +1,13 @@
+[package]
+name = "nexus-look"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "One visual language for GPUI-CE desktop apps"
+repository = "https://github.com/Gakusyun/Nexus-look"
+
+[dependencies]
+gpui-ce = "0.2.2"
+
+[dev-dependencies]
+gpui-ce = { version = "0.2.2", features = ["test-support"] }
