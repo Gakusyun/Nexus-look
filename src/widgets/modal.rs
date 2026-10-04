@@ -13,7 +13,6 @@
 //!     .block(save_row)
 //!     .action(cancel)
 //!     .action(start)
-//!     .build(window, cx)
 //! ```
 //!
 //! The scrim has no listener on purpose: clicking beside a card only takes focus off a box, it does
