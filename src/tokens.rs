@@ -55,6 +55,13 @@ pub const PANEL: f32 = 360.0;
 pub const PROGRESS: f32 = 4.0;
 pub const BADGE: f32 = 20.0;
 
+/// One colour swatch in the accent picker: round, 32 across. Fixed rather than tunable because
+/// it is a target a finger aims at, and two projects' pickers with two sizes read as two
+/// different widgets.
+pub const SWATCH: f32 = 32.0;
+/// The dot inside the swatch that marks the default accent.
+pub const SWATCH_DOT: f32 = 8.0;
+
 pub const ICON_SM: f32 = 16.0;
 pub const ICON_MD: f32 = 20.0;
 pub const ICON_LG: f32 = 32.0;

@@ -503,6 +503,24 @@ pub fn readable_on(bg: Rgba) -> Rgba {
 /// The smallest contrast ratio this library accepts for text.
 pub const TEXT_CONTRAST: f32 = 4.5;
 
+/// The eight colours an accent picker offers, in the order they are drawn:
+/// red, orange, yellow, green, teal, blue, violet, pink.
+///
+/// The library owns them rather than the call site because they are half the design language: a
+/// project that invents its own eight will, sooner or later, land on one that vanishes against a
+/// card or a page — and because "which eight" is a decision that should be made once, checked
+/// once, and look identical in every app wearing this look. See `a_preset_survives_both_palettes`.
+pub const PRESET_ACCENTS: [u32; 8] = [
+    0xe5484d, // red
+    0xf76b15, // orange
+    0xffb224, // yellow
+    0x30a46c, // green
+    0x12a594, // teal
+    0x0090ff, // blue
+    0x7c5cff, // violet
+    0xe93d82, // pink
+];
+
 /// Nudge `accent` toward white or black until it can be read as text on every one of `grounds`.
 ///
 /// The accent lands on both the window and the cards above it, and those two are never equally
@@ -594,6 +612,32 @@ mod tests {
         assert!(luminance(dark.surface) > luminance(dark.bg));
         let light = Theme::resolve(&look(), false);
         assert!(luminance(light.surface) > luminance(light.bg));
+    }
+
+    /// What makes a preset list worth owning: every colour in it has to work as *text* on both
+    /// grounds in both palettes (which is what resolving a theme does to an accent), and the raw
+    /// swatch has to be a shape you can actually see on the card it is drawn on. A swatch you
+    /// cannot see is a colour nobody can pick.
+    #[test]
+    fn a_preset_survives_both_palettes() {
+        for value in PRESET_ACCENTS {
+            for dark in [true, false] {
+                let theme = Theme::resolve(&Look::new().accent(value), dark);
+                let palette = if dark { "dark" } else { "light" };
+                assert!(
+                    contrast(theme.accent, theme.bg) >= TEXT_CONTRAST,
+                    "{value:#08x} cannot be read on the {palette} page"
+                );
+                assert!(
+                    contrast(theme.accent, theme.surface) >= TEXT_CONTRAST,
+                    "{value:#08x} cannot be read on a {palette} card"
+                );
+                assert!(
+                    contrast(rgb(value), theme.surface) >= 1.3,
+                    "{value:#08x} disappears against a {palette} card"
+                );
+            }
+        }
     }
 
     #[test]
