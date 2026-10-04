@@ -2,14 +2,18 @@
 //!
 //! A transient notice is not part of the page. Putting it in the column means it shoves the list
 //! down for the six seconds it lives, and then yanks it back — the layout moves twice for something
-//! that is, by definition, about to leave. So it floats: absolutely positioned, centred at the
-//! bottom, with the shadow that marks a real floating layer.
+//! that is, by definition, about to leave. So it floats: absolutely positioned, centred at the top,
+//! with the shadow that marks a real floating layer.
+//!
+//! It anchors to the nearest `relative()` ancestor rather than to the window, so the host decides
+//! *where* the message belongs by where it puts it in the tree — under a toolbar, over a list —
+//! and the library only decides how far from that edge it sits.
 //!
 //! Two things it deliberately does *not* have:
 //!
 //! * **No hitbox.** Clicks land on whatever is under it. A message the user is not meant to answer
 //!   has no business eating a click aimed at the row behind it.
-//! * **No exit animation.** The card fades and rises in; when the message is gone it is gone. An
+//! * **No exit animation.** The card fades and drops in; when the message is gone it is gone. An
 //!   exit would need the app to keep a dead message alive for another 160ms, and there is nothing
 //!   here worth that state machine.
 
@@ -73,7 +77,7 @@ impl Toast {
             .absolute()
             .left_0()
             .right_0()
-            .bottom(px(space::XL))
+            .top(px(space::XL))
             .flex()
             .flex_row()
             .justify_center()
@@ -102,10 +106,11 @@ impl Toast {
                         settle(motion::BASE),
                         move |element, delta| {
                             // Element opacity does not exist in this version (`Styled` has no
-                            // `opacity()`), so every colour carries the fade itself.
+                            // `opacity()`), so every colour carries the fade itself. The card
+                            // starts a step *above* where it settles and drops into place.
                             let fade = move |color: Rgba| color.opacity(delta);
                             element
-                                .mt(px(motion::SHIFT * (1.0 - delta)))
+                                .mt(px(-motion::SHIFT * (1.0 - delta)))
                                 .bg(fade(surface))
                                 .border_color(fade(border))
                                 .text_color(fade(ink))
