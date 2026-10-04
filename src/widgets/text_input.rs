@@ -50,10 +50,13 @@ pub enum Outcome {
     Ignored,
 }
 
-pub type ChangeHandler = Box<dyn Fn(&str, &mut Window, &mut App) + 'static>;
+/// What a caller wants to hear about an edit. An `Rc` rather than a `Box` because the callback is
+/// handed to [`later`], which needs to own a copy of it to run from outside this widget's own
+/// update scope.
+pub type ChangeHandler = Rc<dyn Fn(&str, &mut Window, &mut App) + 'static>;
 
 /// Escape or Tab. The owner usually closes whatever layer the field is in.
-pub type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
+pub type DismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
 /// A single-line editable field.
 pub struct TextInput {
@@ -125,18 +128,18 @@ impl TextInput {
     }
 
     pub fn on_change(mut self, handler: impl Fn(&str, &mut Window, &mut App) + 'static) -> Self {
-        self.on_change = Some(Box::new(handler));
+        self.on_change = Some(Rc::new(handler));
         self
     }
 
     pub fn on_submit(mut self, handler: impl Fn(&str, &mut Window, &mut App) + 'static) -> Self {
-        self.on_submit = Some(Box::new(handler));
+        self.on_submit = Some(Rc::new(handler));
         self
     }
 
     /// Escape or Tab. The owner usually closes whatever layer the field is in.
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        self.on_dismiss = Some(Box::new(handler));
+        self.on_dismiss = Some(Rc::new(handler));
         self
     }
 
@@ -172,8 +175,9 @@ impl TextInput {
     }
 
     fn notify_change(&self, window: &mut Window, cx: &mut App) {
-        if let Some(handler) = &self.on_change {
-            handler(self.edit.text(), window, cx);
+        if let Some(handler) = self.on_change.clone() {
+            let text = self.edit.text().to_string();
+            later(window, cx, move |window, cx| handler(&text, window, cx));
         }
     }
 
@@ -184,6 +188,24 @@ impl TextInput {
         let measured = self.measured.get();
         if measured > 0.0 { measured } else { 60.0 }
     }
+}
+
+/// Hand one of the caller's callbacks back to them **after** this widget's own update has ended.
+///
+/// A keystroke, an IME commit or a paste reaches these handlers from inside the entity's own
+/// update scope: `cx.listener` runs `entity.update(..)` and gpui keeps the entity *leased* for the
+/// whole closure (`entity_map.rs:164`). So a handler that reads or writes this very field — and
+/// the most natural handler of all does exactly that: "Enter" → *the app reads the box it just
+/// submitted, then clears it* — panics with
+/// `cannot read TextInput while it is already being updated`. That is not a corner case; it is the
+/// first thing every host app writes, and it takes the whole process down.
+///
+/// Only the widget can know it is mid-update, so the widget does the deferring. `Window::defer`
+/// runs at the end of the same effect cycle, once the lease is gone: the caller still gets its
+/// callback in the same frame, never waits for a repaint, and cannot observe the difference
+/// except by not crashing.
+fn later(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Window, &mut App) + 'static) {
+    window.defer(cx, f);
 }
 
 /// Apply a keystroke to the buffer.
@@ -448,21 +470,18 @@ impl Render for TextInput {
             match apply_key(&mut this.edit, event, cx) {
                 Outcome::Handled => {
                     this.caret_on = true;
-                    let text = this.edit.text().to_string();
-                    if let Some(handler) = &this.on_change {
-                        handler(&text, window, cx);
-                    }
+                    this.notify_change(window, cx);
                     cx.notify();
                 }
                 Outcome::Submit => {
                     let text = this.edit.text().to_string();
-                    if let Some(handler) = &this.on_submit {
-                        handler(&text, window, cx);
+                    if let Some(handler) = this.on_submit.clone() {
+                        later(window, cx, move |window, cx| handler(&text, window, cx));
                     }
                 }
                 Outcome::Dismiss => {
-                    if let Some(handler) = &this.on_dismiss {
-                        handler(window, cx);
+                    if let Some(handler) = this.on_dismiss.clone() {
+                        later(window, cx, move |window, cx| handler(window, cx));
                     }
                 }
                 Outcome::Ignored => {}
