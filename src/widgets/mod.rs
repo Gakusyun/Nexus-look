@@ -29,13 +29,13 @@ pub use title_bar::TitleBar;
 
 use std::time::Duration;
 
+use crate::theme::{Look, Theme, Tone};
+use crate::tokens::{ICON_SM, RADIUS, space, text};
 use gpui::prelude::*;
 use gpui::{
     Animation, App, Div, ElementId, Entity, FontWeight, Rgba, SharedString, Svg, Window, div,
     ease_in_out, px, rgb, svg,
 };
-use crate::theme::{Look, Theme, Tone};
-use crate::tokens::{ICON_SM, RADIUS, space, text};
 
 /// How big a control is. Two sizes, and the second one has to be earned (see `STYLE.md`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]

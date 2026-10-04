@@ -57,7 +57,9 @@ impl TitleBar {
         self
     }
 
-    pub fn build(self, window: &Window, cx: &App) -> impl IntoElement {
+    /// Returns a concrete element tree: nothing in it borrows the window or the theme, so callers
+    /// can hand it straight to a parent without carrying either lifetime along.
+    pub fn build(self, window: &Window, cx: &App) -> impl IntoElement + use<> {
         let theme = Theme::of(cx);
         let font = Look::of(cx).font(window);
         let Self {

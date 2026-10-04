@@ -162,7 +162,11 @@ impl TextInput {
     /// Change the placeholder. A localized app switches language while the field is alive, and a
     /// placeholder that only exists at construction would keep quoting the old one until the app
     /// restarted.
-    pub fn set_placeholder(&mut self, placeholder: impl Into<SharedString>, cx: &mut Context<Self>) {
+    pub fn set_placeholder(
+        &mut self,
+        placeholder: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
         self.placeholder = placeholder.into();
         cx.notify();
     }

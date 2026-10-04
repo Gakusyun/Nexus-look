@@ -10,8 +10,7 @@
 use gpui::prelude::*;
 use gpui::{
     AnimationExt, App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce,
-    Rgba,
-    SharedString, Styled, Window, div, px,
+    Rgba, SharedString, Styled, Window, div, px,
 };
 
 use super::{Sizing, blend, icon, lift, toggle, track_hover, watch_hover};

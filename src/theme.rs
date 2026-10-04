@@ -509,7 +509,11 @@ pub const TEXT_CONTRAST: f32 = 4.5;
 /// Returns the input untouched when it is already fine, so most accents survive verbatim.
 pub fn readable(accent: u32, grounds: &[Rgba]) -> Rgba {
     let accent = rgb(accent);
-    let legible = |color: Rgba| grounds.iter().all(|ground| contrast(color, *ground) >= TEXT_CONTRAST);
+    let legible = |color: Rgba| {
+        grounds
+            .iter()
+            .all(|ground| contrast(color, *ground) >= TEXT_CONTRAST)
+    };
     if legible(accent) {
         return accent;
     }
