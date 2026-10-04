@@ -826,3 +826,76 @@ impl EntityInputHandler for TextInput {
         Some(self.edit.utf16_len())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::init;
+    use gpui::{Entity, TestAppContext, div};
+    use std::cell::RefCell;
+
+    /// `on_submit` must be able to read — and clear — the very field it was called for.
+    ///
+    /// It could not before this widget started deferring its callbacks. gpui leases an entity for
+    /// the whole scope of `Context::listener`'s closure (`app/context.rs:252`), so
+    /// `field.read(cx)` inside the handler hit `double_lease_panic`
+    /// (`app/entity_map.rs:207`) and, because the callback cannot unwind, killed the process.
+    /// See `gs-issue.md` #4 in the host project: the first thing an app writes for a text field
+    /// is "on Enter, take the text and clear the box", and it used to take Nexus down.
+    #[gpui::test]
+    fn a_submit_handler_may_read_the_field_it_submitted(cx: &mut TestAppContext) {
+        cx.update(|cx| init(cx, crate::Look::new()));
+
+        struct Host {
+            input: Entity<TextInput>,
+        }
+        impl Render for Host {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut Context<Self>,
+            ) -> impl IntoElement {
+                div().size_full().child(self.input.clone())
+            }
+        }
+
+        let submitted = Rc::new(RefCell::new(String::new()));
+        // The handler runs after the field exists, but is built before it — so the handle is
+        // handed over through a slot rather than captured, the same way an app that builds its
+        // field in a loop has to.
+        let slot: Rc<RefCell<Option<Entity<TextInput>>>> = Rc::new(RefCell::new(None));
+
+        let input = cx.new(|cx| {
+            let submitted = submitted.clone();
+            let slot = slot.clone();
+            TextInput::new(cx, "url").on_submit(move |text, _window, cx| {
+                let field = slot.borrow().clone().expect("wired before any key");
+                // The line that used to panic, twice over: read it, then empty it.
+                assert_eq!(field.read(cx).text(), text);
+                *submitted.borrow_mut() = text.to_string();
+                field.update(cx, |field, cx| field.clear(cx));
+            })
+        });
+        *slot.borrow_mut() = Some(input.clone());
+
+        let window = cx.add_window(move |_, _| Host { input });
+        window
+            .update(cx, |view, window, cx| {
+                let focus = view.input.read(cx).focus_handle().clone();
+                view.input
+                    .update(cx, |field, cx| field.set_text("hello", cx));
+                window.focus(&focus, cx);
+            })
+            .unwrap();
+
+        cx.simulate_keystrokes(window.into(), "enter");
+        cx.run_until_parked();
+
+        assert_eq!(submitted.borrow().as_str(), "hello");
+        window
+            .update(cx, |view, _, cx| {
+                assert_eq!(view.input.read(cx).text(), "");
+            })
+            .unwrap();
+    }
+}
