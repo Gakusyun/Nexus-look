@@ -38,9 +38,9 @@ pub use assets::Assets;
 pub use theme::{Look, PRESET_ACCENTS, Theme, ThemeMode, Tone, contrast, readable, readable_on};
 pub use tokens::*;
 pub use widgets::{
-    Button, Choice, IconButton, Modal, Row, Segmented, SettingGroup, Sizing, SwatchGrid, TextEdit,
-    TextInput, TitleBar, Toast, Variant, card, divider, heading, hint, icon, modal_body_max,
-    modal_width, scroll_fade, subheading,
+    Button, Choice, IconButton, Modal, Row, Segmented, SettingGroup, Sizing, SwatchGrid, Switch,
+    TextEdit, TextInput, TitleBar, Toast, Variant, card, divider, heading, hint, icon,
+    modal_body_max, modal_width, scroll_fade, subheading,
 };
 
 /// Install the look: the configuration and the palette that follows from it.

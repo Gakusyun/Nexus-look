@@ -651,6 +651,47 @@ mod tests {
         }
     }
 
+    /// A switch has to read as two states in both palettes: the off knob against the off track,
+    /// the on knob against the accent, and the off track against both grounds a settings sheet
+    /// can put it on. The geometry is part of the language too — the knob fills the one control
+    /// height exactly, and still has somewhere to go.
+    #[test]
+    fn a_switch_reads_in_both_states_and_modes() {
+        use crate::tokens::{CONTROL, SWITCH, SWITCH_KNOB, SWITCH_PAD};
+        for dark in [true, false] {
+            let theme = Theme::resolve(&look(), dark);
+            let palette = if dark { "dark" } else { "light" };
+            assert!(
+                contrast(theme.surface, theme.border) >= 1.3,
+                "the off knob vanishes into the {palette} track"
+            );
+            assert!(
+                contrast(theme.on_accent, theme.accent) >= TEXT_CONTRAST,
+                "the on knob cannot be read against the {palette} accent"
+            );
+            assert!(
+                contrast(theme.border, theme.bg) >= 1.3,
+                "the {palette} page swallows an off switch"
+            );
+            assert!(
+                contrast(theme.border, theme.surface) >= 1.3,
+                "a {palette} card swallows an off switch"
+            );
+        }
+        // The geometry is fixed by the spec, so it is checked at compile time rather than
+        // pretending to be a runtime fact.
+        const {
+            assert!(
+                SWITCH_KNOB + SWITCH_PAD * 2.0 == CONTROL,
+                "the knob fills the control height; there is no second height"
+            );
+            assert!(
+                SWITCH - SWITCH_KNOB - SWITCH_PAD * 2.0 > 0.0,
+                "the knob has to travel"
+            );
+        }
+    }
+
     #[test]
     fn every_grey_is_neutral() {
         for dark in [true, false] {

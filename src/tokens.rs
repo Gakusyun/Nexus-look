@@ -62,6 +62,17 @@ pub const SWATCH: f32 = 32.0;
 /// The dot inside the swatch that marks the default accent.
 pub const SWATCH_DOT: f32 = 8.0;
 
+/// A switch's track: [`CONTROL`] tall by this wide. Fixed for the same reason as [`SWATCH`] —
+/// it is a control people aim at, and two projects' switches with two sizes read as two
+/// different widgets.
+pub const SWITCH: f32 = 48.0;
+/// How far the knob sits from every edge of the track, and therefore how far it travels:
+/// `SWITCH - SWITCH_KNOB - SWITCH_PAD * 2` = 16.
+pub const SWITCH_PAD: f32 = 4.0;
+/// The knob, square with the language's one radius. `CONTROL` minus a [`SWITCH_PAD`] either side
+/// so it fills the control height exactly instead of inventing a second one.
+pub const SWITCH_KNOB: f32 = CONTROL - SWITCH_PAD * 2.0;
+
 pub const ICON_SM: f32 = 16.0;
 pub const ICON_MD: f32 = 20.0;
 pub const ICON_LG: f32 = 32.0;
