@@ -8,9 +8,7 @@
 use std::rc::Rc;
 
 use gpui::prelude::*;
-use gpui::{
-    App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px,
-};
+use gpui::{App, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
 
 use super::lift;
 use crate::theme::Theme;
@@ -18,7 +16,11 @@ use crate::tokens::{CONTROL, RADIUS, SWITCH, SWITCH_KNOB, SWITCH_PAD};
 
 /// What a switch reports when clicked: the value *after* the toggle, so a handler never has to
 /// work out — and possibly get wrong — which state it is moving to.
-pub type ChangeHandler = Rc<dyn Fn(bool, &ClickEvent, &mut Window, &mut App)>;
+///
+/// By reference because that is what `cx.listener` hands back, for the same reason
+/// [`SwatchGrid`](super::SwatchGrid)'s `PickHandler` is: the event type of a listener is
+/// whatever the handler's second parameter says it is.
+pub type ChangeHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 /// On or off.
 ///
@@ -47,10 +49,7 @@ impl Switch {
         self
     }
 
-    pub fn on_change(
-        mut self,
-        handler: impl Fn(bool, &ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_change(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.handler = Some(Rc::new(handler));
         self
     }
@@ -80,7 +79,7 @@ impl RenderOnce for Switch {
             .hover(move |style| style.bg(lift(track, dark, 0.08)))
             .active(move |style| style.bg(lift(track, dark, 0.16)))
             .when_some(handler, |element, handler| {
-                element.on_click(move |event, window, cx| handler(!on, event, window, cx))
+                element.on_click(move |_event, window, cx| handler(&!on, window, cx))
             })
             .child(
                 // Positioned rather than laid out: the knob must never be able to change the
